@@ -18,6 +18,7 @@ import {
 	CellMode,
 } from './types';
 import { FileSuggestModal } from './FileSuggestModal';
+import { t } from './i18n';
 
 export class GridPanesView extends TextFileView {
 	private gridData: GridPanesData;
@@ -238,7 +239,7 @@ export class GridPanesView extends TextFileView {
 			for (let r = 0; r < rows; r++) {
 				const btn = gridContainer.createDiv({
 					cls: 'grid-panes-del-btn grid-panes-row-del',
-					attr: { 'data-row': String(r), 'aria-label': '删除行' }
+					attr: { 'data-row': String(r), 'aria-label': t(this.app, 'button.deleteRowAria') },
 				});
 				btn.createSpan({ text: '×' });
 				// 定位到该行的第一列，通过 CSS 调整位置
@@ -258,7 +259,7 @@ export class GridPanesView extends TextFileView {
 			for (let c = 0; c < cols; c++) {
 				const btn = gridContainer.createDiv({
 					cls: 'grid-panes-del-btn grid-panes-col-del',
-					attr: { 'data-col': String(c), 'aria-label': '删除列' }
+					attr: { 'data-col': String(c), 'aria-label': t(this.app, 'button.deleteColumnAria') },
 				});
 				btn.createSpan({ text: '×' });
 				// 定位到该列的第一行
@@ -307,7 +308,10 @@ export class GridPanesView extends TextFileView {
 		const newBtn = this.headerContainer.createEl('button', {
 			cls: 'grid-panes-new-layout-btn',
 			text: '+',
-			attr: { title: '新建方案' },
+			attr: {
+				title: t(this.app, 'button.newLayoutTitle'),
+				'aria-label': t(this.app, 'button.newLayoutTitle'),
+			},
 		});
 		newBtn.addEventListener('click', () => {
 			this.createNewLayout();
@@ -318,7 +322,10 @@ export class GridPanesView extends TextFileView {
 			const deleteBtn = this.headerContainer.createEl('button', {
 				cls: 'grid-panes-delete-layout-btn',
 				text: '×',
-				attr: { title: '删除当前方案' },
+				attr: {
+					title: t(this.app, 'button.deleteLayoutTitle'),
+					'aria-label': t(this.app, 'button.deleteLayoutTitle'),
+				},
 			});
 			deleteBtn.addEventListener('click', () => {
 				this.deleteCurrentLayout();
@@ -329,7 +336,10 @@ export class GridPanesView extends TextFileView {
 		const renameBtn = this.headerContainer.createEl('button', {
 			cls: 'grid-panes-rename-layout-btn',
 			text: '✎',
-			attr: { title: '重命名方案' },
+			attr: {
+				title: t(this.app, 'button.renameLayoutTitle'),
+				'aria-label': t(this.app, 'button.renameLayoutTitle'),
+			},
 		});
 		renameBtn.addEventListener('click', () => {
 			this.renameCurrentLayout();
@@ -358,12 +368,12 @@ export class GridPanesView extends TextFileView {
 		}
 
 		// 弹出输入框
-		const inputName = prompt('输入新方案名称:', name);
+		const inputName = prompt(t(this.app, 'layout.newPrompt'), name);
 		if (!inputName || inputName.trim() === '') return;
 
 		const finalName = inputName.trim();
 		if (this.gridData.layouts[finalName]) {
-			alert('方案名称已存在');
+			alert(t(this.app, 'layout.nameExists'));
 			return;
 		}
 
@@ -378,7 +388,7 @@ export class GridPanesView extends TextFileView {
 		const layoutNames = Object.keys(this.gridData.layouts);
 		if (layoutNames.length <= 1) return;
 
-		if (!confirm(`确定删除方案 "${this.gridData.currentLayout}"？`)) return;
+		if (!confirm(t(this.app, 'layout.deleteConfirm', { name: this.gridData.currentLayout }))) return;
 
 		delete this.gridData.layouts[this.gridData.currentLayout];
 		const remainingLayouts = Object.keys(this.gridData.layouts);
@@ -390,12 +400,12 @@ export class GridPanesView extends TextFileView {
 
 	private renameCurrentLayout(): void {
 		const currentName = this.gridData.currentLayout;
-		const newName = prompt('输入新名称:', currentName);
+		const newName = prompt(t(this.app, 'layout.renamePrompt'), currentName);
 		if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
 
 		const finalName = newName.trim();
 		if (this.gridData.layouts[finalName]) {
-			alert('方案名称已存在');
+			alert(t(this.app, 'layout.nameExists'));
 			return;
 		}
 
@@ -477,7 +487,7 @@ export class GridPanesView extends TextFileView {
 				this.pendingFocusKey = null;
 				this.detachEditorView();
 			}
-			cellEl.createDiv({ cls: 'grid-panes-error', text: '文件未找到' });
+			cellEl.createDiv({ cls: 'grid-panes-error', text: t(this.app, 'cell.fileNotFound') });
 			return;
 		}
 
@@ -489,7 +499,7 @@ export class GridPanesView extends TextFileView {
 		headerEl.createSpan({ cls: 'grid-panes-cell-title', text: file.basename });
 
 		if (isActive) {
-			headerEl.createSpan({ cls: 'grid-panes-cell-status', text: '编辑中' });
+			headerEl.createSpan({ cls: 'grid-panes-cell-status', text: t(this.app, 'cell.editing') });
 		}
 
 		// 内容区 - 预览渲染或嵌入编辑器
@@ -503,7 +513,7 @@ export class GridPanesView extends TextFileView {
 
 	private renderEmptyCell(cellEl: HTMLElement, row: number, col: number): void {
 		const placeholder = cellEl.createDiv({ cls: 'grid-panes-empty' });
-		placeholder.createSpan({ text: '点击选择笔记' });
+		placeholder.createSpan({ text: t(this.app, 'cell.emptyPlaceholder') });
 
 		placeholder.addEventListener('click', () => {
 			this.selectNoteForCell(row, col);
@@ -524,21 +534,21 @@ export class GridPanesView extends TextFileView {
 		if (cell?.notePath) {
 			menu.addItem((item) =>
 				item
-					.setTitle('更换笔记')
+					.setTitle(t(this.app, 'menu.replaceNote'))
 					.setIcon('file-edit')
 					.onClick(() => this.selectNoteForCell(row, col))
 			);
 
 			menu.addItem((item) =>
 				item
-					.setTitle('清空')
+					.setTitle(t(this.app, 'menu.clear'))
 					.setIcon('trash')
 					.onClick(() => this.setCell(row, col, null))
 			);
 
 			menu.addItem((item) =>
 				item
-					.setTitle('在新窗口打开')
+					.setTitle(t(this.app, 'menu.openNewTab'))
 					.setIcon('external-link')
 					.onClick(async () => {
 						const file = this.app.vault.getAbstractFileByPath(cell.notePath!);
@@ -550,7 +560,7 @@ export class GridPanesView extends TextFileView {
 		} else {
 			menu.addItem((item) =>
 				item
-					.setTitle('选择笔记')
+					.setTitle(t(this.app, 'menu.selectNote'))
 					.setIcon('file-plus')
 					.onClick(() => this.selectNoteForCell(row, col))
 			);
@@ -565,7 +575,10 @@ export class GridPanesView extends TextFileView {
 
 		// 底部添加行按钮
 		if (rows < MAX_GRID_SIZE) {
-			const addRowBtn = gridContainer.createDiv({ cls: 'grid-panes-add-btn grid-panes-add-row' });
+			const addRowBtn = gridContainer.createDiv({
+			cls: 'grid-panes-add-btn grid-panes-add-row',
+			attr: { 'aria-label': t(this.app, 'command.addRowBelow') },
+		});
 			addRowBtn.createSpan({ text: '+' });
 			addRowBtn.style.gridRow = String(rows + 1);
 			addRowBtn.style.gridColumn = `1 / ${cols + 1}`;
@@ -574,7 +587,10 @@ export class GridPanesView extends TextFileView {
 
 		// 右侧添加列按钮
 		if (cols < MAX_GRID_SIZE) {
-			const addColBtn = gridContainer.createDiv({ cls: 'grid-panes-add-btn grid-panes-add-col' });
+			const addColBtn = gridContainer.createDiv({
+			cls: 'grid-panes-add-btn grid-panes-add-col',
+			attr: { 'aria-label': t(this.app, 'command.addColumnRight') },
+		});
 			addColBtn.createSpan({ text: '+' });
 			addColBtn.style.gridRow = `1 / ${rows + 1}`;
 			addColBtn.style.gridColumn = String(cols + 1);
@@ -643,7 +659,7 @@ export class GridPanesView extends TextFileView {
 		this.disposePreviewComponents();
 		this.requestSave();
 		this.render();
-		this.showUndoToast('已删除行');
+		this.showUndoToast(t(this.app, 'toast.rowDeleted'));
 	}
 
 	removeColumn(): void {
@@ -666,7 +682,7 @@ export class GridPanesView extends TextFileView {
 		this.disposePreviewComponents();
 		this.requestSave();
 		this.render();
-		this.showUndoToast('已删除列');
+		this.showUndoToast(t(this.app, 'toast.columnDeleted'));
 	}
 
 	private getCellKey(row: number, col: number): string {
@@ -746,7 +762,7 @@ export class GridPanesView extends TextFileView {
 				this.clearPreviewComponent(key);
 			}
 			if (renderId !== this.renderId) return;
-			contentEl.createDiv({ cls: 'grid-panes-error', text: '读取失败' });
+			contentEl.createDiv({ cls: 'grid-panes-error', text: t(this.app, 'cell.readFailed') });
 			return;
 		}
 
@@ -768,7 +784,7 @@ export class GridPanesView extends TextFileView {
 			this.clearPreviewComponent(key);
 			if (renderId !== this.renderId) return;
 			contentEl.empty();
-			contentEl.createDiv({ cls: 'grid-panes-error', text: '渲染失败' });
+			contentEl.createDiv({ cls: 'grid-panes-error', text: t(this.app, 'cell.renderFailed') });
 		}
 	}
 
@@ -952,7 +968,7 @@ export class GridPanesView extends TextFileView {
 		content.createSpan({ text: msg });
 
 		const undoBtn = content.createEl('button', {
-			text: '撤销',
+			text: t(this.app, 'toast.undo'),
 			cls: 'grid-panes-undo-btn',
 		});
 

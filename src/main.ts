@@ -1,6 +1,7 @@
 import { Notice, Plugin } from 'obsidian';
 import { GridPanesView } from './GridPanesView';
 import { GRID_PANES_VIEW_TYPE, GRID_PANES_EXTENSION, DEFAULT_GRID_DATA } from './types';
+import { t } from './i18n';
 
 export default class GridPanesPlugin extends Plugin {
 	async onload() {
@@ -16,9 +17,9 @@ export default class GridPanesPlugin extends Plugin {
 
 		if (existingView) {
 			if (alreadyRegisteredByThis) {
-				new Notice('Grid Panes 已注册视图，请重启 Obsidian 以完成重新加载。');
+				new Notice(t(this.app, 'notice.viewRegistered'));
 			} else {
-				throw new Error(`View type "${GRID_PANES_VIEW_TYPE}" 已被其他插件注册。请禁用冲突插件或重启 Obsidian。`);
+				throw new Error(t(this.app, 'error.viewConflict', { type: GRID_PANES_VIEW_TYPE }));
 			}
 		} else {
 			this.registerView(
@@ -32,14 +33,14 @@ export default class GridPanesPlugin extends Plugin {
 		this.registerExtensions([GRID_PANES_EXTENSION], GRID_PANES_VIEW_TYPE);
 
 		// Ribbon 图标：创建新网格
-		this.addRibbonIcon('layout-grid', 'Grid Panes: 创建新网格', async () => {
+		this.addRibbonIcon('layout-grid', t(this.app, 'ribbon.createNewGrid'), async () => {
 			await this.createNewGridFile();
 		});
 
 		// 注册命令
 		this.addCommand({
 			id: 'create-new-grid',
-			name: '创建新网格',
+			name: t(this.app, 'command.createNewGrid'),
 			callback: async () => {
 				await this.createNewGridFile();
 			},
@@ -47,7 +48,7 @@ export default class GridPanesPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'add-row-above',
-			name: '在顶部添加一行',
+			name: t(this.app, 'command.addRowAbove'),
 			checkCallback: (checking) => {
 				const view = this.getActiveGridView();
 				if (view) {
@@ -60,7 +61,7 @@ export default class GridPanesPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'add-row-below',
-			name: '在底部添加一行',
+			name: t(this.app, 'command.addRowBelow'),
 			checkCallback: (checking) => {
 				const view = this.getActiveGridView();
 				if (view) {
@@ -73,7 +74,7 @@ export default class GridPanesPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'add-column-left',
-			name: '在左侧添加一列',
+			name: t(this.app, 'command.addColumnLeft'),
 			checkCallback: (checking) => {
 				const view = this.getActiveGridView();
 				if (view) {
@@ -86,7 +87,7 @@ export default class GridPanesPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'add-column-right',
-			name: '在右侧添加一列',
+			name: t(this.app, 'command.addColumnRight'),
 			checkCallback: (checking) => {
 				const view = this.getActiveGridView();
 				if (view) {
@@ -99,7 +100,7 @@ export default class GridPanesPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'remove-row',
-			name: '删除最后一行',
+			name: t(this.app, 'command.removeRow'),
 			checkCallback: (checking) => {
 				const view = this.getActiveGridView();
 				if (view) {
@@ -112,7 +113,7 @@ export default class GridPanesPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'remove-column',
-			name: '删除最后一列',
+			name: t(this.app, 'command.removeColumn'),
 			checkCallback: (checking) => {
 				const view = this.getActiveGridView();
 				if (view) {
@@ -136,7 +137,7 @@ export default class GridPanesPlugin extends Plugin {
 
 	private async createNewGridFile(): Promise<void> {
 		// 生成唯一文件名
-		const baseName = 'Grid Layout';
+		const baseName = t(this.app, 'grid.baseFileName');
 		let fileName = `${baseName}.${GRID_PANES_EXTENSION}`;
 		let counter = 1;
 
