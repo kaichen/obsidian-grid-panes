@@ -81,9 +81,12 @@ npm run build        # Production build (tsc check + esbuild)
 npm run lint         # ESLint
 ```
 
+CRITAL: always run build to check any errors after code changes.
+
 ## Notes
 
 - **Large file**: `GridPanesView.ts` at 512 lines — candidate for splitting if more features added
 - **Markdown rendering**: Uses `MarkdownRenderer.render()` with Component for cleanup
 - **Cell components tracked**: `cellComponents: Map<string, Component>` for proper unloading
 - **File extension registered**: `.gridpanes` files auto-open in GridPanesView
+

@@ -30,6 +30,8 @@ export class GridPanesView extends TextFileView {
 	private activeCellKey: string | null = null;
 	private pendingFocusKey: string | null = null;
 	private renderId = 0;
+	private undoData: { data: GridPanesData; timestamp: number } | null = null;
+	private undoTimeout: number | null = null;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -116,6 +118,9 @@ export class GridPanesView extends TextFileView {
 		// 顶部方案选择器
 		this.headerContainer = container.createDiv({ cls: 'grid-panes-header' });
 		this.gridContainer = container.createDiv({ cls: 'grid-panes-grid' });
+		this.gridContainer.addEventListener('mouseleave', () => {
+			this.setHoverState(null, null);
+		});
 		this.registerEvent(this.app.vault.on('delete', (file) => {
 			if (!(file instanceof TFile)) return;
 			if (this.file && file.path === this.file.path) return;
@@ -140,6 +145,9 @@ export class GridPanesView extends TextFileView {
 			if (this.isActiveFile(file.path)) return;
 			this.render();
 		}));
+		this.gridContainer?.addEventListener('mouseleave', () => {
+			this.setHoverState(null, null);
+		});
 		this.render();
 	}
 
@@ -152,6 +160,29 @@ export class GridPanesView extends TextFileView {
 
 	private getCurrentLayout(): GridLayout {
 		return this.gridData.layouts[this.gridData.currentLayout] || DEFAULT_LAYOUT;
+	}
+
+	private setHoverState(row: number | null, col: number | null): void {
+		if (!this.gridContainer) return;
+		const buttons = this.gridContainer.findAll('.grid-panes-del-btn');
+		for (const btn of buttons) {
+			const btnRow = btn.getAttribute('data-row');
+			const btnCol = btn.getAttribute('data-col');
+			let isVisible = false;
+
+			if (btnRow !== null && row !== null && String(row) === btnRow) {
+				isVisible = true;
+			}
+			if (btnCol !== null && col !== null && String(col) === btnCol) {
+				isVisible = true;
+			}
+
+			if (isVisible) {
+				btn.addClass('visible');
+			} else {
+				btn.removeClass('visible');
+			}
+		}
 	}
 
 	private render(): void {
@@ -169,6 +200,43 @@ export class GridPanesView extends TextFileView {
 		// 设置 CSS Grid 布局
 		gridContainer.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 		gridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+		// 渲染删除控制按钮
+		if (rows > MIN_GRID_SIZE) {
+			for (let r = 0; r < rows; r++) {
+				const btn = gridContainer.createDiv({
+					cls: 'grid-panes-del-btn grid-panes-row-del',
+					attr: { 'data-row': String(r), 'aria-label': '删除行' }
+				});
+				btn.createSpan({ text: '×' });
+				// 定位到该行的第一列，通过 CSS 调整位置
+				btn.style.gridRow = String(r + 1);
+				btn.style.gridColumn = '1';
+				btn.addEventListener('mouseenter', () => this.setHoverState(r, null));
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					this.removeRowAt(r);
+				});
+			}
+		}
+
+		if (cols > MIN_GRID_SIZE) {
+			for (let c = 0; c < cols; c++) {
+				const btn = gridContainer.createDiv({
+					cls: 'grid-panes-del-btn grid-panes-col-del',
+					attr: { 'data-col': String(c), 'aria-label': '删除列' }
+				});
+				btn.createSpan({ text: '×' });
+				// 定位到该列的第一行
+				btn.style.gridRow = '1';
+				btn.style.gridColumn = String(c + 1);
+				btn.addEventListener('mouseenter', () => this.setHoverState(null, c));
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					this.removeColumnAt(c);
+				});
+			}
+		}
 
 		// 渲染单元格
 		for (let row = 0; row < rows; row++) {
@@ -305,8 +373,11 @@ export class GridPanesView extends TextFileView {
 	private renderCell(row: number, col: number, renderId: number, gridContainer: HTMLElement): void {
 		const cell = this.getCell(row, col);
 		const cellEl = gridContainer.createDiv({ cls: 'grid-panes-cell' });
+		cellEl.setAttribute('data-row', String(row));
+		cellEl.setAttribute('data-col', String(col));
 		cellEl.style.gridRow = String(row + 1);
 		cellEl.style.gridColumn = String(col + 1);
+		cellEl.addEventListener('mouseenter', () => this.setHoverState(row, col));
 		const key = this.getCellKey(row, col);
 		if (key === this.activeCellKey) {
 			cellEl.addClass('grid-panes-cell-active');
@@ -506,26 +577,96 @@ export class GridPanesView extends TextFileView {
 
 	removeRow(): void {
 		const layout = this.getCurrentLayout();
+		this.removeRowAt(layout.rows - 1);
+	}
+
+	removeRowAt(row: number): void {
+		const layout = this.getCurrentLayout();
 		if (layout.rows <= MIN_GRID_SIZE) return;
+		if (row < 0 || row >= layout.rows) return;
+		
+		this.saveUndoState();
+		
 		layout.rows--;
-		// 移除超出范围的单元格
-		layout.cells = layout.cells.filter((c) => c.row < layout.rows);
+		layout.cells = layout.cells
+			.filter((cell) => cell.row !== row)
+			.map((cell) => (cell.row > row ? { ...cell, row: cell.row - 1 } : cell));
+		this.adjustActiveCellKeyForRowDelete(row);
+		this.disposePreviewComponents();
 		this.requestSave();
 		this.render();
+		this.showUndoToast('已删除行');
 	}
 
 	removeColumn(): void {
 		const layout = this.getCurrentLayout();
+		this.removeColumnAt(layout.cols - 1);
+	}
+
+	removeColumnAt(col: number): void {
+		const layout = this.getCurrentLayout();
 		if (layout.cols <= MIN_GRID_SIZE) return;
+		if (col < 0 || col >= layout.cols) return;
+
+		this.saveUndoState();
+
 		layout.cols--;
-		// 移除超出范围的单元格
-		layout.cells = layout.cells.filter((c) => c.col < layout.cols);
+		layout.cells = layout.cells
+			.filter((cell) => cell.col !== col)
+			.map((cell) => (cell.col > col ? { ...cell, col: cell.col - 1 } : cell));
+		this.adjustActiveCellKeyForColumnDelete(col);
+		this.disposePreviewComponents();
 		this.requestSave();
 		this.render();
+		this.showUndoToast('已删除列');
 	}
 
 	private getCellKey(row: number, col: number): string {
 		return `${row}-${col}`;
+	}
+
+	private parseCellKey(key: string | null): { row: number; col: number } | null {
+		if (!key) return null;
+		const parts = key.split('-');
+		if (parts.length !== 2) return null;
+		const row = Number(parts[0]);
+		const col = Number(parts[1]);
+		if (Number.isNaN(row) || Number.isNaN(col)) return null;
+		return { row, col };
+	}
+
+	private adjustActiveCellKeyForRowDelete(row: number): void {
+		const active = this.parseCellKey(this.activeCellKey);
+		if (!active) return;
+		if (active.row === row) {
+			this.activeCellKey = null;
+			this.pendingFocusKey = null;
+			this.detachEditorView();
+			return;
+		}
+		if (active.row > row) {
+			this.activeCellKey = this.getCellKey(active.row - 1, active.col);
+			if (this.pendingFocusKey) {
+				this.pendingFocusKey = this.activeCellKey;
+			}
+		}
+	}
+
+	private adjustActiveCellKeyForColumnDelete(col: number): void {
+		const active = this.parseCellKey(this.activeCellKey);
+		if (!active) return;
+		if (active.col === col) {
+			this.activeCellKey = null;
+			this.pendingFocusKey = null;
+			this.detachEditorView();
+			return;
+		}
+		if (active.col > col) {
+			this.activeCellKey = this.getCellKey(active.row, active.col - 1);
+			if (this.pendingFocusKey) {
+				this.pendingFocusKey = this.activeCellKey;
+			}
+		}
 	}
 
 	private activateCell(row: number, col: number): void {
@@ -745,5 +886,42 @@ export class GridPanesView extends TextFileView {
 			}
 		}
 		return updated;
+	}
+
+	private saveUndoState(): void {
+		this.undoData = {
+			data: JSON.parse(JSON.stringify(this.gridData)),
+			timestamp: Date.now(),
+		};
+	}
+
+	private showUndoToast(msg: string): void {
+		const container = this.contentEl;
+		container.findAll('.grid-panes-undo-toast').forEach((el) => el.remove());
+
+		const toast = container.createDiv({ cls: 'grid-panes-undo-toast' });
+		const content = toast.createDiv({ cls: 'grid-panes-undo-content' });
+		content.createSpan({ text: msg });
+
+		const undoBtn = content.createEl('button', {
+			text: '撤销',
+			cls: 'grid-panes-undo-btn',
+		});
+
+		undoBtn.addEventListener('click', () => {
+			if (this.undoData) {
+				this.gridData = this.undoData.data;
+				this.undoData = null;
+				this.requestSave();
+				this.render();
+				toast.remove();
+			}
+		});
+
+		if (this.undoTimeout) window.clearTimeout(this.undoTimeout);
+		this.undoTimeout = window.setTimeout(() => {
+			if (toast.parentElement) toast.remove();
+			this.undoData = null;
+		}, 5000);
 	}
 }
