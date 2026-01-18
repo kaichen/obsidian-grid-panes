@@ -1,0 +1,10 @@
+{
+	"id": "obsidian-grid-panes",
+	"name": "Grid Panes",
+	"version": "1.0.0",
+	"minAppVersion": "1.0.0",
+	"description": "Display multiple notes in a customizable grid layout for easy comparison and reference.",
+	"author": "Kai Chen",
+	"authorUrl": "https://thekaiway.com",
+	"isDesktopOnly": true
+}

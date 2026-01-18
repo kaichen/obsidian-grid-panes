@@ -1,0 +1,261 @@
+/* Grid Panes 插件样式 */
+
+.grid-panes-container {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	padding: 8px;
+	box-sizing: border-box;
+}
+
+/* 顶部方案选择器 */
+.grid-panes-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding-bottom: 8px;
+	flex-shrink: 0;
+}
+
+.grid-panes-layout-select {
+	padding: 4px 8px;
+	border-radius: 4px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font-size: 13px;
+	cursor: pointer;
+	min-width: 120px;
+}
+
+.grid-panes-layout-select:hover {
+	border-color: var(--interactive-accent);
+}
+
+.grid-panes-layout-select:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.grid-panes-new-layout-btn,
+.grid-panes-delete-layout-btn,
+.grid-panes-rename-layout-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-size: 14px;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.grid-panes-new-layout-btn:hover,
+.grid-panes-rename-layout-btn:hover {
+	border-color: var(--interactive-accent);
+	color: var(--interactive-accent);
+	background: var(--background-modifier-hover);
+}
+
+.grid-panes-delete-layout-btn:hover {
+	border-color: var(--text-error);
+	color: var(--text-error);
+	background: var(--background-modifier-hover);
+}
+
+.grid-panes-grid {
+	display: grid;
+	gap: 8px;
+	flex: 1;
+	min-height: 0;
+	position: relative;
+}
+
+/* 单元格 */
+.grid-panes-cell {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-primary);
+	overflow: hidden;
+	min-height: 0;
+}
+
+.grid-panes-cell-active {
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.grid-panes-cell-active .grid-panes-cell-header {
+	background: var(--background-modifier-hover);
+}
+
+/* 单元格标题栏 */
+.grid-panes-cell-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 6px 10px;
+	background: var(--background-secondary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+}
+
+.grid-panes-cell-title {
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.grid-panes-mode-btn {
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	background: var(--background-modifier-hover);
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.grid-panes-mode-btn:hover {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.grid-panes-cell-status {
+	font-size: 11px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	background: var(--background-modifier-hover);
+	color: var(--interactive-accent);
+}
+
+/* 单元格内容区 */
+.grid-panes-cell-content {
+	flex: 1;
+	overflow: hidden;
+	min-height: 0;
+}
+
+/* MarkdownView 容器 */
+.grid-panes-markdown-view {
+	height: 100%;
+	width: 100%;
+	overflow: hidden;
+}
+
+.grid-panes-markdown-view .markdown-preview-view,
+.grid-panes-markdown-view .markdown-source-view {
+	height: 100%;
+}
+
+.grid-panes-markdown-view .markdown-preview-view {
+	overflow: auto;
+	padding: var(--file-margins);
+}
+
+.grid-panes-markdown-view .markdown-preview-sizer {
+	max-width: var(--file-line-width);
+	margin: 0 auto;
+}
+
+.grid-panes-markdown-view .markdown-source-view {
+	padding: 0;
+}
+
+.grid-panes-markdown-view .cm-editor {
+	height: 100%;
+}
+
+.grid-panes-markdown-view .cm-scroller {
+	overflow: auto;
+}
+
+/* 空单元格占位 */
+.grid-panes-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	border: 2px dashed var(--background-modifier-border);
+	border-radius: 6px;
+	color: var(--text-muted);
+	font-size: 14px;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.grid-panes-empty:hover {
+	border-color: var(--interactive-accent);
+	color: var(--interactive-accent);
+	background: var(--background-modifier-hover);
+}
+
+/* 错误提示 */
+.grid-panes-error {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: var(--text-error);
+	font-size: 14px;
+}
+
+/* 添加行/列按钮 */
+.grid-panes-add-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	cursor: pointer;
+	color: var(--text-muted);
+	font-size: 20px;
+	font-weight: 300;
+}
+
+.grid-panes-grid:hover .grid-panes-add-btn {
+	opacity: 0.5;
+}
+
+.grid-panes-add-btn:hover {
+	opacity: 1 !important;
+	color: var(--interactive-accent);
+}
+
+.grid-panes-add-row {
+	height: 32px;
+	border: 2px dashed var(--background-modifier-border);
+	border-radius: 6px;
+	margin-top: 4px;
+}
+
+.grid-panes-add-row:hover {
+	border-color: var(--interactive-accent);
+	background: var(--background-modifier-hover);
+}
+
+.grid-panes-add-col {
+	width: 32px;
+	border: 2px dashed var(--background-modifier-border);
+	border-radius: 6px;
+	margin-left: 4px;
+}
+
+.grid-panes-add-col:hover {
+	border-color: var(--interactive-accent);
+	background: var(--background-modifier-hover);
+}
+
+.grid-panes-hidden-tabs {
+	display: none !important;
+}
