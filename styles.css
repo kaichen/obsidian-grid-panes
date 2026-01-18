@@ -349,3 +349,18 @@
 .grid-panes-hidden-tabs {
 	display: none !important;
 }
+
+/* Hide Obsidian's internal view header in grid cells to avoid duplicate titles */
+.grid-panes-markdown-view .view-header {
+	display: none !important;
+}
+
+/* Hide inline title in grid panes */
+.grid-panes-markdown-view .inline-title {
+	display: none !important;
+}
+
+/* Hide first H1 in preview to avoid redundancy with cell header */
+.grid-panes-markdown-view .markdown-preview-view h1:first-of-type {
+	display: none;
+}

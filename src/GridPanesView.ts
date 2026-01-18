@@ -32,6 +32,10 @@ export class GridPanesView extends TextFileView {
 	private renderId = 0;
 	private undoData: { data: GridPanesData; timestamp: number } | null = null;
 	private undoTimeout: number | null = null;
+	private rowHideTimers: Map<number, number> = new Map();
+	private colHideTimers: Map<number, number> = new Map();
+	private visibleRows: Set<number> = new Set();
+	private visibleCols: Set<number> = new Set();
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -103,6 +107,7 @@ export class GridPanesView extends TextFileView {
 	}
 
 	clear(): void {
+		this.resetHoverState();
 		this.disposeEditorLeaf();
 		this.disposePreviewComponents();
 		this.activeCellKey = null;
@@ -118,9 +123,7 @@ export class GridPanesView extends TextFileView {
 		// 顶部方案选择器
 		this.headerContainer = container.createDiv({ cls: 'grid-panes-header' });
 		this.gridContainer = container.createDiv({ cls: 'grid-panes-grid' });
-		this.gridContainer.addEventListener('mouseleave', () => {
-			this.setHoverState(null, null);
-		});
+
 		this.registerEvent(this.app.vault.on('delete', (file) => {
 			if (!(file instanceof TFile)) return;
 			if (this.file && file.path === this.file.path) return;
@@ -145,13 +148,12 @@ export class GridPanesView extends TextFileView {
 			if (this.isActiveFile(file.path)) return;
 			this.render();
 		}));
-		this.gridContainer?.addEventListener('mouseleave', () => {
-			this.setHoverState(null, null);
-		});
+
 		this.render();
 	}
 
 	async onClose(): Promise<void> {
+		this.resetHoverState();
 		this.disposeEditorLeaf();
 		this.disposePreviewComponents();
 		this.gridContainer = null;
@@ -162,28 +164,58 @@ export class GridPanesView extends TextFileView {
 		return this.gridData.layouts[this.gridData.currentLayout] || DEFAULT_LAYOUT;
 	}
 
-	private setHoverState(row: number | null, col: number | null): void {
-		if (!this.gridContainer) return;
-		const buttons = this.gridContainer.findAll('.grid-panes-del-btn');
-		for (const btn of buttons) {
-			const btnRow = btn.getAttribute('data-row');
-			const btnCol = btn.getAttribute('data-col');
-			let isVisible = false;
-
-			if (btnRow !== null && row !== null && String(row) === btnRow) {
-				isVisible = true;
-			}
-			if (btnCol !== null && col !== null && String(col) === btnCol) {
-				isVisible = true;
-			}
-
-			if (isVisible) {
-				btn.addClass('visible');
-			} else {
-				btn.removeClass('visible');
-			}
+	private showRow(row: number): void {
+		if (this.rowHideTimers.has(row)) {
+			window.clearTimeout(this.rowHideTimers.get(row));
+			this.rowHideTimers.delete(row);
 		}
+		this.visibleRows.add(row);
+		const btn = this.gridContainer?.querySelector(`.grid-panes-row-del[data-row="${row}"]`);
+		if (btn) btn.addClass('visible');
 	}
+
+	private hideRowDelayed(row: number): void {
+		if (this.rowHideTimers.has(row)) return;
+		const timerId = window.setTimeout(() => {
+			this.visibleRows.delete(row);
+			const btn = this.gridContainer?.querySelector(`.grid-panes-row-del[data-row="${row}"]`);
+			if (btn) btn.removeClass('visible');
+			this.rowHideTimers.delete(row);
+		}, 1000);
+		this.rowHideTimers.set(row, timerId);
+	}
+
+	private showCol(col: number): void {
+		if (this.colHideTimers.has(col)) {
+			window.clearTimeout(this.colHideTimers.get(col));
+			this.colHideTimers.delete(col);
+		}
+		this.visibleCols.add(col);
+		const btn = this.gridContainer?.querySelector(`.grid-panes-col-del[data-col="${col}"]`);
+		if (btn) btn.addClass('visible');
+	}
+
+	private hideColDelayed(col: number): void {
+		if (this.colHideTimers.has(col)) return;
+		const timerId = window.setTimeout(() => {
+			this.visibleCols.delete(col);
+			const btn = this.gridContainer?.querySelector(`.grid-panes-col-del[data-col="${col}"]`);
+			if (btn) btn.removeClass('visible');
+			this.colHideTimers.delete(col);
+		}, 1000);
+		this.colHideTimers.set(col, timerId);
+	}
+
+	private resetHoverState(): void {
+		for (const timer of this.rowHideTimers.values()) window.clearTimeout(timer);
+		this.rowHideTimers.clear();
+		for (const timer of this.colHideTimers.values()) window.clearTimeout(timer);
+		this.colHideTimers.clear();
+		this.visibleRows.clear();
+		this.visibleCols.clear();
+	}
+
+
 
 	private render(): void {
 		const gridContainer = this.gridContainer;
@@ -212,7 +244,9 @@ export class GridPanesView extends TextFileView {
 				// 定位到该行的第一列，通过 CSS 调整位置
 				btn.style.gridRow = String(r + 1);
 				btn.style.gridColumn = '1';
-				btn.addEventListener('mouseenter', () => this.setHoverState(r, null));
+				if (this.visibleRows.has(r)) btn.addClass('visible');
+				btn.addEventListener('mouseenter', () => this.showRow(r));
+				btn.addEventListener('mouseleave', () => this.hideRowDelayed(r));
 				btn.addEventListener('click', (e) => {
 					e.stopPropagation();
 					this.removeRowAt(r);
@@ -230,7 +264,9 @@ export class GridPanesView extends TextFileView {
 				// 定位到该列的第一行
 				btn.style.gridRow = '1';
 				btn.style.gridColumn = String(c + 1);
-				btn.addEventListener('mouseenter', () => this.setHoverState(null, c));
+				if (this.visibleCols.has(c)) btn.addClass('visible');
+				btn.addEventListener('mouseenter', () => this.showCol(c));
+				btn.addEventListener('mouseleave', () => this.hideColDelayed(c));
 				btn.addEventListener('click', (e) => {
 					e.stopPropagation();
 					this.removeColumnAt(c);
@@ -303,6 +339,7 @@ export class GridPanesView extends TextFileView {
 	private switchLayout(name: string): void {
 		if (this.gridData.layouts[name]) {
 			this.gridData.currentLayout = name;
+			this.resetHoverState();
 			this.activeCellKey = null;
 			this.pendingFocusKey = null;
 			this.requestSave();
@@ -332,6 +369,7 @@ export class GridPanesView extends TextFileView {
 
 		this.gridData.layouts[finalName] = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
 		this.gridData.currentLayout = finalName;
+		this.resetHoverState();
 		this.requestSave();
 		this.render();
 	}
@@ -345,6 +383,7 @@ export class GridPanesView extends TextFileView {
 		delete this.gridData.layouts[this.gridData.currentLayout];
 		const remainingLayouts = Object.keys(this.gridData.layouts);
 		this.gridData.currentLayout = remainingLayouts[0] ?? 'default';
+		this.resetHoverState();
 		this.requestSave();
 		this.render();
 	}
@@ -377,7 +416,14 @@ export class GridPanesView extends TextFileView {
 		cellEl.setAttribute('data-col', String(col));
 		cellEl.style.gridRow = String(row + 1);
 		cellEl.style.gridColumn = String(col + 1);
-		cellEl.addEventListener('mouseenter', () => this.setHoverState(row, col));
+		cellEl.addEventListener('mouseenter', () => {
+			this.showRow(row);
+			this.showCol(col);
+		});
+		cellEl.addEventListener('mouseleave', () => {
+			this.hideRowDelayed(row);
+			this.hideColDelayed(col);
+		});
 		const key = this.getCellKey(row, col);
 		if (key === this.activeCellKey) {
 			cellEl.addClass('grid-panes-cell-active');
@@ -435,13 +481,15 @@ export class GridPanesView extends TextFileView {
 			return;
 		}
 
-		// 标题栏
-		const header = cellEl.createDiv({ cls: 'grid-panes-cell-header' });
-		header.createSpan({ cls: 'grid-panes-cell-title', text: file.basename });
 		const key = this.getCellKey(cell.row, cell.col);
 		const isActive = key === this.activeCellKey;
+
+		// 渲染单元格标题栏
+		const headerEl = cellEl.createDiv({ cls: 'grid-panes-cell-header' });
+		headerEl.createSpan({ cls: 'grid-panes-cell-title', text: file.basename });
+
 		if (isActive) {
-			header.createSpan({ cls: 'grid-panes-cell-status', text: '编辑中' });
+			headerEl.createSpan({ cls: 'grid-panes-cell-status', text: '编辑中' });
 		}
 
 		// 内容区 - 预览渲染或嵌入编辑器
