@@ -5,25 +5,18 @@ type Locale = 'en' | 'zh';
 type TranslationKey =
 	| 'plugin.name'
 	| 'notice.viewRegistered'
+	| 'notice.noActiveCell'
 	| 'error.viewConflict'
-	| 'ribbon.createNewGrid'
-	| 'command.createNewGrid'
+	| 'ribbon.openGridView'
+	| 'command.openGridView'
+	| 'command.selectNoteForCell'
 	| 'command.addRowAbove'
 	| 'command.addRowBelow'
 	| 'command.addColumnLeft'
 	| 'command.addColumnRight'
 	| 'command.removeRow'
 	| 'command.removeColumn'
-	| 'layout.default'
-	| 'layout.newBaseName'
-	| 'layout.newPrompt'
-	| 'layout.renamePrompt'
-	| 'layout.nameExists'
-	| 'layout.deleteConfirm'
-	| 'grid.baseFileName'
-	| 'button.newLayoutTitle'
-	| 'button.deleteLayoutTitle'
-	| 'button.renameLayoutTitle'
+	| 'view.displayText'
 	| 'button.deleteRowAria'
 	| 'button.deleteColumnAria'
 	| 'cell.editing'
@@ -44,25 +37,18 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
 	en: {
 		'plugin.name': 'Grid Panes',
 		'notice.viewRegistered': 'Grid Panes view already registered. Please restart Obsidian to reload.',
+		'notice.noActiveCell': 'Select a grid cell first',
 		'error.viewConflict': 'View type "{type}" is already registered by another plugin. Disable the conflicting plugin or restart Obsidian.',
-		'ribbon.createNewGrid': 'Grid Panes: Create new grid',
-		'command.createNewGrid': 'Create new grid',
+		'ribbon.openGridView': 'Grid Panes: Open grid view',
+		'command.openGridView': 'Open grid view',
+		'command.selectNoteForCell': 'Choose note for active cell',
 		'command.addRowAbove': 'Add row at top',
 		'command.addRowBelow': 'Add row at bottom',
 		'command.addColumnLeft': 'Add column at left',
 		'command.addColumnRight': 'Add column at right',
 		'command.removeRow': 'Remove last row',
 		'command.removeColumn': 'Remove last column',
-		'layout.default': 'Default',
-		'layout.newBaseName': 'Layout',
-		'layout.newPrompt': 'Enter new layout name:',
-		'layout.renamePrompt': 'Enter new name:',
-		'layout.nameExists': 'Layout name already exists',
-		'layout.deleteConfirm': 'Delete layout "{name}"?',
-		'grid.baseFileName': 'Grid Layout',
-		'button.newLayoutTitle': 'New layout',
-		'button.deleteLayoutTitle': 'Delete current layout',
-		'button.renameLayoutTitle': 'Rename layout',
+		'view.displayText': 'Grid Panes',
 		'button.deleteRowAria': 'Delete row',
 		'button.deleteColumnAria': 'Delete column',
 		'cell.editing': 'Editing',
@@ -82,25 +68,18 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
 	zh: {
 		'plugin.name': '网格面板',
 		'notice.viewRegistered': 'Grid Panes 已注册视图，请重启 Obsidian 以完成重新加载。',
+		'notice.noActiveCell': '请先选择一个网格单元',
 		'error.viewConflict': '视图类型 "{type}" 已被其他插件注册。请禁用冲突插件或重启 Obsidian。',
-		'ribbon.createNewGrid': 'Grid Panes: 创建新网格',
-		'command.createNewGrid': '创建新网格',
+		'ribbon.openGridView': 'Grid Panes: 打开网格视图',
+		'command.openGridView': '打开网格视图',
+		'command.selectNoteForCell': '为当前单元格选择笔记',
 		'command.addRowAbove': '在顶部添加一行',
 		'command.addRowBelow': '在底部添加一行',
 		'command.addColumnLeft': '在左侧添加一列',
 		'command.addColumnRight': '在右侧添加一列',
 		'command.removeRow': '删除最后一行',
 		'command.removeColumn': '删除最后一列',
-		'layout.default': '默认',
-		'layout.newBaseName': '方案',
-		'layout.newPrompt': '输入新方案名称:',
-		'layout.renamePrompt': '输入新名称:',
-		'layout.nameExists': '方案名称已存在',
-		'layout.deleteConfirm': '确定删除方案 "{name}"？',
-		'grid.baseFileName': '网格布局',
-		'button.newLayoutTitle': '新建方案',
-		'button.deleteLayoutTitle': '删除当前方案',
-		'button.renameLayoutTitle': '重命名方案',
+		'view.displayText': '网格面板',
 		'button.deleteRowAria': '删除行',
 		'button.deleteColumnAria': '删除列',
 		'cell.editing': '编辑中',

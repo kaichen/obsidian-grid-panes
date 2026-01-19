@@ -8,66 +8,6 @@
 	box-sizing: border-box;
 }
 
-/* 顶部方案选择器 */
-.grid-panes-header {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding-bottom: 8px;
-	flex-shrink: 0;
-}
-
-.grid-panes-layout-select {
-	padding: 4px 8px;
-	border-radius: 4px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	font-size: 13px;
-	cursor: pointer;
-	min-width: 120px;
-}
-
-.grid-panes-layout-select:hover {
-	border-color: var(--interactive-accent);
-}
-
-.grid-panes-layout-select:focus {
-	outline: none;
-	border-color: var(--interactive-accent);
-	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
-}
-
-.grid-panes-new-layout-btn,
-.grid-panes-delete-layout-btn,
-.grid-panes-rename-layout-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 26px;
-	height: 26px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	background: var(--background-secondary);
-	color: var(--text-muted);
-	font-size: 14px;
-	cursor: pointer;
-	transition: all 0.15s ease;
-}
-
-.grid-panes-new-layout-btn:hover,
-.grid-panes-rename-layout-btn:hover {
-	border-color: var(--interactive-accent);
-	color: var(--interactive-accent);
-	background: var(--background-modifier-hover);
-}
-
-.grid-panes-delete-layout-btn:hover {
-	border-color: var(--text-error);
-	color: var(--text-error);
-	background: var(--background-modifier-hover);
-}
-
 .grid-panes-grid {
 	display: grid;
 	gap: 8px;
