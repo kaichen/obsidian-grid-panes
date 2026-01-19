@@ -33,10 +33,45 @@ export const DEFAULT_LAYOUT: GridLayout = {
 	],
 };
 
+function isGridCell(value: unknown): value is GridCell {
+	if (!value || typeof value !== 'object') return false;
+	const cell = value as Record<string, unknown>;
+	const rowOk = typeof cell.row === 'number';
+	const colOk = typeof cell.col === 'number';
+	const notePathOk = cell.notePath === null || typeof cell.notePath === 'string';
+	const modeOk = cell.mode === 'preview' || cell.mode === 'edit';
+	return rowOk && colOk && notePathOk && modeOk;
+}
+
+function parseLayout(value: unknown): GridLayout | null {
+	if (!value || typeof value !== 'object') return null;
+	const obj = value as Record<string, unknown>;
+	const rows = typeof obj.rows === 'number' ? obj.rows : null;
+	const cols = typeof obj.cols === 'number' ? obj.cols : null;
+	if (rows === null || cols === null) return null;
+	const cells = Array.isArray(obj.cells) ? obj.cells.filter(isGridCell) : [];
+	return { rows, cols, cells };
+}
+
+function cloneLayout(layout: GridLayout): GridLayout {
+	return {
+		rows: layout.rows,
+		cols: layout.cols,
+		cells: layout.cells.map((cell) => ({ ...cell })),
+	};
+}
+
+export function cloneGridPanesData(data: GridPanesData): GridPanesData {
+	return {
+		version: data.version,
+		layout: cloneLayout(data.layout),
+	};
+}
+
 export function createDefaultGridData(): GridPanesData {
 	return {
 		version: 3,
-		layout: JSON.parse(JSON.stringify(DEFAULT_LAYOUT)),
+		layout: cloneLayout(DEFAULT_LAYOUT),
 	};
 }
 
@@ -49,33 +84,32 @@ export function migrateGridPanesData(data: unknown): GridPanesData {
 
 	// 迁移 v1 格式到 v2
 	if (!obj.layouts && obj.rows !== undefined && obj.cols !== undefined) {
-		const layout: GridLayout = {
-			rows: obj.rows as number,
-			cols: obj.cols as number,
-			cells: (obj.cells as GridCell[]) || [],
-		};
+		const layout = parseLayout({ rows: obj.rows, cols: obj.cols, cells: obj.cells });
 		return {
 			version: 3,
-			layout,
+			layout: layout ? cloneLayout(layout) : cloneLayout(DEFAULT_LAYOUT),
 		};
 	}
 
 	// 迁移 v2 布局记录到 v3
 	if (obj.layouts && obj.currentLayout) {
-		const layouts = obj.layouts as Record<string, GridLayout>;
-		const current = obj.currentLayout as string;
-		const layout = layouts?.[current] ?? Object.values(layouts ?? {})[0];
+		const layouts = obj.layouts as Record<string, unknown>;
+		const current = typeof obj.currentLayout === 'string' ? obj.currentLayout : '';
+		const layout = parseLayout(layouts?.[current]) ?? parseLayout(Object.values(layouts ?? {})[0]);
 		return {
 			version: 3,
-			layout: layout ? JSON.parse(JSON.stringify(layout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT)),
+			layout: layout ? cloneLayout(layout) : cloneLayout(DEFAULT_LAYOUT),
 		};
 	}
 
 	if (obj.layout && typeof obj.layout === 'object') {
-		return {
-			version: 3,
-			layout: obj.layout as GridLayout,
-		};
+		const layout = parseLayout(obj.layout);
+		if (layout) {
+			return {
+				version: 3,
+				layout: cloneLayout(layout),
+			};
+		}
 	}
 
 	return createDefaultGridData();

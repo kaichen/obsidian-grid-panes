@@ -146,7 +146,6 @@ export default class GridPanesPlugin extends Plugin {
 			window.clearTimeout(this.saveTimer);
 			this.saveTimer = null;
 		}
-		this.app.workspace.detachLeavesOfType(GRID_PANES_VIEW_TYPE);
 	}
 
 	private getActiveGridView(): GridPanesView | null {
@@ -184,7 +183,7 @@ export default class GridPanesPlugin extends Plugin {
 	}
 
 	private async loadGridData(): Promise<void> {
-		const raw = await this.loadData();
+		const raw = (await this.loadData()) as unknown;
 		this.gridData = migrateGridPanesData(raw);
 	}
 }

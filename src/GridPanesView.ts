@@ -19,6 +19,7 @@ import {
 	CellMode,
 	createDefaultGridData,
 	migrateGridPanesData,
+	cloneGridPanesData,
 } from './types';
 import { FileSuggestModal } from './FileSuggestModal';
 import { t } from './i18n';
@@ -185,8 +186,10 @@ export class GridPanesView extends ItemView {
 		const { rows, cols } = layout;
 
 		// 设置 CSS Grid 布局
-		gridContainer.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-		gridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+		gridContainer.setCssProps({
+			'grid-template-rows': `repeat(${rows}, 1fr)`,
+			'grid-template-columns': `repeat(${cols}, 1fr)`,
+		});
 
 		// 渲染删除控制按钮
 		if (rows > MIN_GRID_SIZE) {
@@ -197,8 +200,10 @@ export class GridPanesView extends ItemView {
 				});
 				btn.createSpan({ text: '×' });
 				// 定位到该行的第一列，通过 CSS 调整位置
-				btn.style.gridRow = String(r + 1);
-				btn.style.gridColumn = '1';
+				btn.setCssProps({
+					'grid-row': String(r + 1),
+					'grid-column': '1',
+				});
 				if (this.visibleRows.has(r)) btn.addClass('visible');
 				btn.addEventListener('mouseenter', () => this.showRow(r));
 				btn.addEventListener('mouseleave', () => this.hideRowDelayed(r));
@@ -217,8 +222,10 @@ export class GridPanesView extends ItemView {
 				});
 				btn.createSpan({ text: '×' });
 				// 定位到该列的第一行
-				btn.style.gridRow = '1';
-				btn.style.gridColumn = String(c + 1);
+				btn.setCssProps({
+					'grid-row': '1',
+					'grid-column': String(c + 1),
+				});
 				if (this.visibleCols.has(c)) btn.addClass('visible');
 				btn.addEventListener('mouseenter', () => this.showCol(c));
 				btn.addEventListener('mouseleave', () => this.hideColDelayed(c));
@@ -245,8 +252,10 @@ export class GridPanesView extends ItemView {
 		const cellEl = gridContainer.createDiv({ cls: 'grid-panes-cell' });
 		cellEl.setAttribute('data-row', String(row));
 		cellEl.setAttribute('data-col', String(col));
-		cellEl.style.gridRow = String(row + 1);
-		cellEl.style.gridColumn = String(col + 1);
+		cellEl.setCssProps({
+			'grid-row': String(row + 1),
+			'grid-column': String(col + 1),
+		});
 		cellEl.addEventListener('mouseenter', () => {
 			this.showRow(row);
 			this.showCol(col);
@@ -272,7 +281,7 @@ export class GridPanesView extends ItemView {
 		});
 
 		if (cell?.notePath) {
-			this.renderNoteContent(cellEl, cell, renderId);
+			void this.renderNoteContent(cellEl, cell, renderId);
 		} else {
 			this.renderEmptyCell(cellEl, row, col);
 		}
@@ -626,6 +635,7 @@ export class GridPanesView extends ItemView {
 	): Promise<void> {
 		const key = this.getCellKey(cell.row, cell.col);
 		const view = await this.getOrCreateEditorView(file);
+		void this.app.workspace.revealLeaf(view.leaf);
 
 		if (renderId !== this.renderId) return;
 		if (view.containerEl.parentElement !== contentEl) {
@@ -638,7 +648,7 @@ export class GridPanesView extends ItemView {
 	}
 
 	private async getOrCreateEditorView(file: TFile): Promise<MarkdownView> {
-		const desiredMode: 'source' = 'source';
+		const desiredMode = 'source' as const;
 		if (!this.editorLeaf || !this.editorView) {
 			const leaf = this.app.workspace.createLeafBySplit(this.leaf, 'vertical', true);
 			await leaf.setViewState({
@@ -672,7 +682,7 @@ export class GridPanesView extends ItemView {
 		}
 		const leafEl = (leaf as { containerEl?: HTMLElement }).containerEl;
 		if (leafEl) {
-			leafEl.style.display = 'none';
+			leafEl.setCssProps({ display: 'none' });
 		}
 	}
 
@@ -782,7 +792,7 @@ export class GridPanesView extends ItemView {
 
 	private saveUndoState(): void {
 		this.undoData = {
-			data: JSON.parse(JSON.stringify(this.gridData)),
+			data: cloneGridPanesData(this.gridData),
 			timestamp: Date.now(),
 		};
 	}
