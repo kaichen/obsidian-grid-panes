@@ -1,10 +1,15 @@
 import { Notice, Plugin } from 'obsidian';
 import { GridPanesView } from './GridPanesView';
-import { GRID_PANES_VIEW_TYPE, GRID_PANES_EXTENSION, DEFAULT_GRID_DATA } from './types';
+import { GRID_PANES_VIEW_TYPE, GridPanesData, createDefaultGridData, migrateGridPanesData } from './types';
 import { t } from './i18n';
 
 export default class GridPanesPlugin extends Plugin {
+	private gridData: GridPanesData = createDefaultGridData();
+	private saveTimer: number | null = null;
+
 	async onload() {
+		await this.loadGridData();
+
 		// 注册自定义视图（避免重复注册导致崩溃）
 		const globalKey = '__obsidianGridPanesViewRegistered';
 		const viewRegistry = (this.app as { viewRegistry?: Record<string, unknown> }).viewRegistry as
@@ -24,25 +29,22 @@ export default class GridPanesPlugin extends Plugin {
 		} else {
 			this.registerView(
 				GRID_PANES_VIEW_TYPE,
-				(leaf) => new GridPanesView(leaf)
+				(leaf) => new GridPanesView(leaf, this)
 			);
 			(globalThis as Record<string, unknown>)[globalKey] = true;
 		}
 
-		// 注册 .gridpanes 文件扩展名
-		this.registerExtensions([GRID_PANES_EXTENSION], GRID_PANES_VIEW_TYPE);
-
-		// Ribbon 图标：创建新网格
-		this.addRibbonIcon('layout-grid', t(this.app, 'ribbon.createNewGrid'), async () => {
-			await this.createNewGridFile();
+		// Ribbon 图标：打开网格视图
+		this.addRibbonIcon('layout-grid', t(this.app, 'ribbon.openGridView'), async () => {
+			await this.openGridView();
 		});
 
 		// 注册命令
 		this.addCommand({
-			id: 'create-new-grid',
-			name: t(this.app, 'command.createNewGrid'),
+			id: 'open-grid-view',
+			name: t(this.app, 'command.openGridView'),
 			callback: async () => {
-				await this.createNewGridFile();
+				await this.openGridView();
 			},
 		});
 
@@ -123,10 +125,27 @@ export default class GridPanesPlugin extends Plugin {
 				return false;
 			},
 		});
+
+		this.addCommand({
+			id: 'select-note-for-cell',
+			name: t(this.app, 'command.selectNoteForCell'),
+			checkCallback: (checking) => {
+				const view = this.getActiveGridView();
+				if (view) {
+					if (!checking) view.selectNoteForActiveCell();
+					return true;
+				}
+				return false;
+			},
+		});
 	}
 
 	onunload() {
 		// 清理视图
+		if (this.saveTimer) {
+			window.clearTimeout(this.saveTimer);
+			this.saveTimer = null;
+		}
 		this.app.workspace.detachLeavesOfType(GRID_PANES_VIEW_TYPE);
 	}
 
@@ -135,23 +154,37 @@ export default class GridPanesPlugin extends Plugin {
 		return leaf;
 	}
 
-	private async createNewGridFile(): Promise<void> {
-		// 生成唯一文件名
-		const baseName = t(this.app, 'grid.baseFileName');
-		let fileName = `${baseName}.${GRID_PANES_EXTENSION}`;
-		let counter = 1;
-
-		while (this.app.vault.getAbstractFileByPath(fileName)) {
-			fileName = `${baseName} ${counter}.${GRID_PANES_EXTENSION}`;
-			counter++;
+	async openGridView(): Promise<void> {
+		const leaves = this.app.workspace.getLeavesOfType(GRID_PANES_VIEW_TYPE);
+		const leaf = leaves[0] ?? this.app.workspace.getLeaf();
+		for (const extra of leaves.slice(1)) {
+			extra.detach();
 		}
+		await leaf.setViewState({ type: GRID_PANES_VIEW_TYPE, active: true });
+		this.app.workspace.setActiveLeaf(leaf, { focus: true });
+	}
 
-		// 创建文件
-		const content = JSON.stringify(DEFAULT_GRID_DATA, null, 2);
-		const file = await this.app.vault.create(fileName, content);
+	getGridData(): GridPanesData {
+		return this.gridData;
+	}
 
-		// 打开文件
-		const leaf = this.app.workspace.getLeaf();
-		await leaf.openFile(file);
+	setGridData(data: GridPanesData): void {
+		this.gridData = data;
+		this.queueSave();
+	}
+
+	private queueSave(): void {
+		if (this.saveTimer) {
+			window.clearTimeout(this.saveTimer);
+		}
+		this.saveTimer = window.setTimeout(() => {
+			this.saveTimer = null;
+			void this.saveData(this.gridData);
+		}, 300);
+	}
+
+	private async loadGridData(): Promise<void> {
+		const raw = await this.loadData();
+		this.gridData = migrateGridPanesData(raw);
 	}
 }

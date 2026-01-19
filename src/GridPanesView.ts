@@ -1,11 +1,12 @@
 import {
-	TextFileView,
+	ItemView,
 	WorkspaceLeaf,
 	TFile,
 	Menu,
 	MarkdownView,
 	MarkdownRenderer,
 	Component,
+	Notice,
 } from 'obsidian';
 import {
 	GRID_PANES_VIEW_TYPE,
@@ -16,14 +17,17 @@ import {
 	MIN_GRID_SIZE,
 	MAX_GRID_SIZE,
 	CellMode,
+	createDefaultGridData,
+	migrateGridPanesData,
 } from './types';
 import { FileSuggestModal } from './FileSuggestModal';
 import { t } from './i18n';
+import type GridPanesPlugin from './main';
 
-export class GridPanesView extends TextFileView {
+export class GridPanesView extends ItemView {
+	private plugin: GridPanesPlugin;
 	private gridData: GridPanesData;
 	private gridContainer: HTMLElement | null = null;
-	private headerContainer: HTMLElement | null = null;
 	private editorLeaf: WorkspaceLeaf | null = null;
 	private editorView: MarkdownView | null = null;
 	private previewComponents: Map<string, Component> = new Map();
@@ -38,19 +42,10 @@ export class GridPanesView extends TextFileView {
 	private visibleRows: Set<number> = new Set();
 	private visibleCols: Set<number> = new Set();
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(leaf: WorkspaceLeaf, plugin: GridPanesPlugin) {
 		super(leaf);
-		this.gridData = this.createDefaultData();
-	}
-
-	private createDefaultData(): GridPanesData {
-		return {
-			version: 2,
-			currentLayout: 'default',
-			layouts: {
-				default: JSON.parse(JSON.stringify(DEFAULT_LAYOUT)),
-			},
-		};
+		this.plugin = plugin;
+		this.gridData = createDefaultGridData();
 	}
 
 	getViewType(): string {
@@ -58,53 +53,11 @@ export class GridPanesView extends TextFileView {
 	}
 
 	getDisplayText(): string {
-		return this.file?.basename ?? 'Grid Panes';
+		return t(this.app, 'view.displayText');
 	}
 
-	getViewData(): string {
-		return JSON.stringify(this.gridData, null, 2);
-	}
-
-	setViewData(data: string, clear: boolean): void {
-		if (clear) {
-			this.disposeEditorLeaf();
-			this.disposePreviewComponents();
-			this.activeCellKey = null;
-			this.pendingFocusKey = null;
-		}
-		try {
-			const parsed = data ? JSON.parse(data) : null;
-			this.gridData = this.migrateData(parsed);
-		} catch {
-			this.gridData = this.createDefaultData();
-		}
-		if (this.gridContainer && this.headerContainer) {
-			this.render();
-		}
-	}
-
-	private migrateData(data: unknown): GridPanesData {
-		if (!data || typeof data !== 'object') {
-			return this.createDefaultData();
-		}
-
-		const obj = data as Record<string, unknown>;
-
-		// 迁移 v1 格式到 v2
-		if (!obj.layouts && obj.rows !== undefined && obj.cols !== undefined) {
-			const layout: GridLayout = {
-				rows: obj.rows as number,
-				cols: obj.cols as number,
-				cells: (obj.cells as GridCell[]) || [],
-			};
-			return {
-				version: 2,
-				currentLayout: 'default',
-				layouts: { default: layout },
-			};
-		}
-
-		return obj as unknown as GridPanesData;
+	getIcon(): string {
+		return 'layout-grid';
 	}
 
 	clear(): void {
@@ -113,7 +66,8 @@ export class GridPanesView extends TextFileView {
 		this.disposePreviewComponents();
 		this.activeCellKey = null;
 		this.pendingFocusKey = null;
-		this.gridData = this.createDefaultData();
+		this.gridData = createDefaultGridData();
+		this.requestSave();
 	}
 
 	async onOpen(): Promise<void> {
@@ -121,13 +75,12 @@ export class GridPanesView extends TextFileView {
 		container.empty();
 		container.addClass('grid-panes-container');
 
-		// 顶部方案选择器
-		this.headerContainer = container.createDiv({ cls: 'grid-panes-header' });
 		this.gridContainer = container.createDiv({ cls: 'grid-panes-grid' });
+
+		this.gridData = migrateGridPanesData(this.plugin.getGridData());
 
 		this.registerEvent(this.app.vault.on('delete', (file) => {
 			if (!(file instanceof TFile)) return;
-			if (this.file && file.path === this.file.path) return;
 			const updated = this.clearNotePaths(file.path);
 			if (updated) {
 				this.requestSave();
@@ -136,7 +89,6 @@ export class GridPanesView extends TextFileView {
 		}));
 		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
 			if (!(file instanceof TFile)) return;
-			if (this.file && file.path === this.file.path) return;
 			const updated = this.updateNotePaths(oldPath, file.path);
 			if (updated) {
 				this.requestSave();
@@ -158,11 +110,14 @@ export class GridPanesView extends TextFileView {
 		this.disposeEditorLeaf();
 		this.disposePreviewComponents();
 		this.gridContainer = null;
-		this.headerContainer = null;
 	}
 
 	private getCurrentLayout(): GridLayout {
-		return this.gridData.layouts[this.gridData.currentLayout] || DEFAULT_LAYOUT;
+		return this.gridData.layout || DEFAULT_LAYOUT;
+	}
+
+	private requestSave(): void {
+		this.plugin.setGridData(this.gridData);
 	}
 
 	private showRow(row: number): void {
@@ -220,9 +175,8 @@ export class GridPanesView extends TextFileView {
 
 	private render(): void {
 		const gridContainer = this.gridContainer;
-		if (!gridContainer || !this.headerContainer) return;
+		if (!gridContainer) return;
 		const renderId = ++this.renderId;
-		this.renderHeader();
 		gridContainer.empty();
 
 		const layout = this.getCurrentLayout();
@@ -284,139 +238,6 @@ export class GridPanesView extends TextFileView {
 
 		// 渲染增加行/列的按钮
 		this.renderAddButtons(gridContainer);
-	}
-
-	private renderHeader(): void {
-		if (!this.headerContainer) return;
-		this.headerContainer.empty();
-
-		const layoutNames = Object.keys(this.gridData.layouts);
-
-		// 下拉选择器
-		const select = this.headerContainer.createEl('select', { cls: 'grid-panes-layout-select' });
-		for (const name of layoutNames) {
-			const option = select.createEl('option', { text: name, value: name });
-			if (name === this.gridData.currentLayout) {
-				option.selected = true;
-			}
-		}
-		select.addEventListener('change', () => {
-			this.switchLayout(select.value);
-		});
-
-		// 新建按钮
-		const newBtn = this.headerContainer.createEl('button', {
-			cls: 'grid-panes-new-layout-btn',
-			text: '+',
-			attr: {
-				title: t(this.app, 'button.newLayoutTitle'),
-				'aria-label': t(this.app, 'button.newLayoutTitle'),
-			},
-		});
-		newBtn.addEventListener('click', () => {
-			this.createNewLayout();
-		});
-
-		// 删除按钮（仅当有多个方案时显示）
-		if (layoutNames.length > 1) {
-			const deleteBtn = this.headerContainer.createEl('button', {
-				cls: 'grid-panes-delete-layout-btn',
-				text: '×',
-				attr: {
-					title: t(this.app, 'button.deleteLayoutTitle'),
-					'aria-label': t(this.app, 'button.deleteLayoutTitle'),
-				},
-			});
-			deleteBtn.addEventListener('click', () => {
-				this.deleteCurrentLayout();
-			});
-		}
-
-		// 重命名按钮
-		const renameBtn = this.headerContainer.createEl('button', {
-			cls: 'grid-panes-rename-layout-btn',
-			text: '✎',
-			attr: {
-				title: t(this.app, 'button.renameLayoutTitle'),
-				'aria-label': t(this.app, 'button.renameLayoutTitle'),
-			},
-		});
-		renameBtn.addEventListener('click', () => {
-			this.renameCurrentLayout();
-		});
-	}
-
-	private switchLayout(name: string): void {
-		if (this.gridData.layouts[name]) {
-			this.gridData.currentLayout = name;
-			this.resetHoverState();
-			this.activeCellKey = null;
-			this.pendingFocusKey = null;
-			this.requestSave();
-			this.render();
-		}
-	}
-
-	private createNewLayout(): void {
-		let baseName = 'Layout';
-		let counter = 1;
-		let name = baseName;
-
-		while (this.gridData.layouts[name]) {
-			name = `${baseName} ${counter}`;
-			counter++;
-		}
-
-		// 弹出输入框
-		const inputName = prompt(t(this.app, 'layout.newPrompt'), name);
-		if (!inputName || inputName.trim() === '') return;
-
-		const finalName = inputName.trim();
-		if (this.gridData.layouts[finalName]) {
-			alert(t(this.app, 'layout.nameExists'));
-			return;
-		}
-
-		this.gridData.layouts[finalName] = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
-		this.gridData.currentLayout = finalName;
-		this.resetHoverState();
-		this.requestSave();
-		this.render();
-	}
-
-	private deleteCurrentLayout(): void {
-		const layoutNames = Object.keys(this.gridData.layouts);
-		if (layoutNames.length <= 1) return;
-
-		if (!confirm(t(this.app, 'layout.deleteConfirm', { name: this.gridData.currentLayout }))) return;
-
-		delete this.gridData.layouts[this.gridData.currentLayout];
-		const remainingLayouts = Object.keys(this.gridData.layouts);
-		this.gridData.currentLayout = remainingLayouts[0] ?? 'default';
-		this.resetHoverState();
-		this.requestSave();
-		this.render();
-	}
-
-	private renameCurrentLayout(): void {
-		const currentName = this.gridData.currentLayout;
-		const newName = prompt(t(this.app, 'layout.renamePrompt'), currentName);
-		if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
-
-		const finalName = newName.trim();
-		if (this.gridData.layouts[finalName]) {
-			alert(t(this.app, 'layout.nameExists'));
-			return;
-		}
-
-		const currentLayout = this.gridData.layouts[currentName];
-		if (!currentLayout) return;
-
-		this.gridData.layouts[finalName] = currentLayout;
-		delete this.gridData.layouts[currentName];
-		this.gridData.currentLayout = finalName;
-		this.requestSave();
-		this.render();
 	}
 
 	private renderCell(row: number, col: number, renderId: number, gridContainer: HTMLElement): void {
@@ -525,6 +346,15 @@ export class GridPanesView extends TextFileView {
 			this.activeCellKey = this.getCellKey(row, col);
 			this.setCell(row, col, file.path, 'preview');
 		}).open();
+	}
+
+	selectNoteForActiveCell(): void {
+		const active = this.parseCellKey(this.activeCellKey);
+		if (!active) {
+			new Notice(t(this.app, 'notice.noActiveCell'));
+			return;
+		}
+		this.selectNoteForCell(active.row, active.col);
 	}
 
 	private showCellContextMenu(e: MouseEvent, row: number, col: number): void {
@@ -928,12 +758,11 @@ export class GridPanesView extends TextFileView {
 
 	private clearNotePaths(path: string): boolean {
 		let updated = false;
-		for (const layout of Object.values(this.gridData.layouts)) {
-			for (const cell of layout.cells) {
-				if (cell.notePath === path) {
-					cell.notePath = null;
-					updated = true;
-				}
+		const layout = this.getCurrentLayout();
+		for (const cell of layout.cells) {
+			if (cell.notePath === path) {
+				cell.notePath = null;
+				updated = true;
 			}
 		}
 		return updated;
@@ -941,12 +770,11 @@ export class GridPanesView extends TextFileView {
 
 	private updateNotePaths(oldPath: string, newPath: string): boolean {
 		let updated = false;
-		for (const layout of Object.values(this.gridData.layouts)) {
-			for (const cell of layout.cells) {
-				if (cell.notePath === oldPath) {
-					cell.notePath = newPath;
-					updated = true;
-				}
+		const layout = this.getCurrentLayout();
+		for (const cell of layout.cells) {
+			if (cell.notePath === oldPath) {
+				cell.notePath = newPath;
+				updated = true;
 			}
 		}
 		return updated;
