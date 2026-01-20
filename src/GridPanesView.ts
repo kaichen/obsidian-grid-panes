@@ -80,6 +80,14 @@ export class GridPanesView extends ItemView {
 
 		this.gridData = migrateGridPanesData(this.plugin.getGridData());
 
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', (leaf) => {
+				if (!leaf || !this.editorLeaf) return;
+				if (leaf !== this.editorLeaf) return;
+				this.app.workspace.setActiveLeaf(this.leaf, { focus: false });
+			})
+		);
+
 		this.registerEvent(this.app.vault.on('delete', (file) => {
 			if (!(file instanceof TFile)) return;
 			const updated = this.clearNotePaths(file.path);
@@ -635,8 +643,6 @@ export class GridPanesView extends ItemView {
 	): Promise<void> {
 		const key = this.getCellKey(cell.row, cell.col);
 		const view = await this.getOrCreateEditorView(file);
-		void this.app.workspace.revealLeaf(view.leaf);
-
 		if (renderId !== this.renderId) return;
 		if (view.containerEl.parentElement !== contentEl) {
 			contentEl.appendChild(view.containerEl);
@@ -662,16 +668,24 @@ export class GridPanesView extends ItemView {
 			const view = leaf.view as MarkdownView;
 			this.editorLeaf = leaf;
 			this.editorView = view;
+			this.lockEditorLeaf(leaf, view);
 			this.hideEditorLeaf(leaf);
 			view.containerEl.addClass('grid-panes-markdown-view');
 			return view;
 		}
 
+		this.lockEditorLeaf(this.editorLeaf, this.editorView);
 		const currentPath = this.editorView.file?.path;
 		if (currentPath !== file.path || this.editorView.getMode() !== desiredMode) {
 			await this.editorLeaf.openFile(file, { state: { mode: desiredMode }, active: false });
 		}
 		return this.editorView;
+	}
+
+	private lockEditorLeaf(leaf: WorkspaceLeaf, view: MarkdownView): void {
+		// Prevent the hidden editor leaf from being reused by the file explorer.
+		leaf.setPinned(true);
+		view.navigation = false;
 	}
 
 	private hideEditorLeaf(leaf: WorkspaceLeaf): void {
