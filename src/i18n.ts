@@ -19,6 +19,7 @@ type TranslationKey =
 	| 'view.displayText'
 	| 'button.deleteRowAria'
 	| 'button.deleteColumnAria'
+	| 'button.swapAria'
 	| 'cell.editing'
 	| 'cell.fileNotFound'
 	| 'cell.emptyPlaceholder'
@@ -51,6 +52,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
 		'view.displayText': 'Grid Panes',
 		'button.deleteRowAria': 'Delete row',
 		'button.deleteColumnAria': 'Delete column',
+		'button.swapAria': 'Swap adjacent notes',
 		'cell.editing': 'Editing',
 		'cell.fileNotFound': 'File not found',
 		'cell.emptyPlaceholder': 'Click to choose note',
@@ -82,6 +84,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
 		'view.displayText': '网格面板',
 		'button.deleteRowAria': '删除行',
 		'button.deleteColumnAria': '删除列',
+		'button.swapAria': '交换相邻笔记',
 		'cell.editing': '编辑中',
 		'cell.fileNotFound': '文件未找到',
 		'cell.emptyPlaceholder': '点击选择笔记',

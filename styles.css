@@ -35,6 +35,38 @@
 	z-index: 10;
 }
 
+.grid-panes-swap-btn {
+	position: absolute;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-muted);
+	font-size: 12px;
+	cursor: pointer;
+	opacity: 0;
+	pointer-events: none;
+	transform: translate(-50%, -50%) scale(0.9);
+	transition: opacity 0.12s ease, transform 0.12s ease, background 0.12s ease, color 0.12s ease;
+	z-index: 12;
+}
+
+.grid-panes-swap-btn.visible {
+	opacity: 1;
+	pointer-events: auto;
+	transform: translate(-50%, -50%) scale(1);
+}
+
+.grid-panes-swap-btn:hover {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: var(--interactive-accent);
+}
+
 .grid-panes-del-btn.visible {
 	opacity: 1;
 	pointer-events: auto;

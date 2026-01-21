@@ -25,6 +25,23 @@ import { FileSuggestModal } from './FileSuggestModal';
 import { t } from './i18n';
 import type GridPanesPlugin from './main';
 
+type SwapDirection = 'horizontal' | 'vertical';
+
+type SwapTarget = {
+	fromRow: number;
+	fromCol: number;
+	toRow: number;
+	toCol: number;
+	direction: SwapDirection;
+	centerX: number;
+	centerY: number;
+};
+
+type SetCellOptions = {
+	render?: boolean;
+	save?: boolean;
+};
+
 export class GridPanesView extends ItemView {
 	private plugin: GridPanesPlugin;
 	private gridData: GridPanesData;
@@ -42,6 +59,8 @@ export class GridPanesView extends ItemView {
 	private colHideTimers: Map<number, number> = new Map();
 	private visibleRows: Set<number> = new Set();
 	private visibleCols: Set<number> = new Set();
+	private swapButtonEl: HTMLButtonElement | null = null;
+	private swapTarget: SwapTarget | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: GridPanesPlugin) {
 		super(leaf);
@@ -77,6 +96,7 @@ export class GridPanesView extends ItemView {
 		container.addClass('grid-panes-container');
 
 		this.gridContainer = container.createDiv({ cls: 'grid-panes-grid' });
+		this.registerSwapEvents();
 
 		this.gridData = migrateGridPanesData(this.plugin.getGridData());
 
@@ -178,6 +198,7 @@ export class GridPanesView extends ItemView {
 		this.colHideTimers.clear();
 		this.visibleRows.clear();
 		this.visibleCols.clear();
+		this.hideSwapButton();
 	}
 
 
@@ -187,6 +208,8 @@ export class GridPanesView extends ItemView {
 		if (!gridContainer) return;
 		const renderId = ++this.renderId;
 		gridContainer.empty();
+		this.swapButtonEl = null;
+		this.swapTarget = null;
 
 		const layout = this.getCurrentLayout();
 		this.ensureActiveCellValid(layout);
@@ -253,6 +276,7 @@ export class GridPanesView extends ItemView {
 
 		// 渲染增加行/列的按钮
 		this.renderAddButtons(gridContainer);
+		this.ensureSwapButton(gridContainer);
 	}
 
 	private renderCell(row: number, col: number, renderId: number, gridContainer: HTMLElement): void {
@@ -300,7 +324,13 @@ export class GridPanesView extends ItemView {
 		return layout.cells.find((c) => c.row === row && c.col === col);
 	}
 
-	private setCell(row: number, col: number, notePath: string | null, mode: CellMode = 'preview'): void {
+	private setCell(
+		row: number,
+		col: number,
+		notePath: string | null,
+		mode: CellMode = 'preview',
+		options?: SetCellOptions
+	): void {
 		const layout = this.getCurrentLayout();
 		const existingIndex = layout.cells.findIndex((c) => c.row === row && c.col === col);
 		const newCell: GridCell = { row, col, notePath, mode };
@@ -311,8 +341,12 @@ export class GridPanesView extends ItemView {
 			layout.cells.push(newCell);
 		}
 
-		this.requestSave();
-		this.render();
+		if (options?.save !== false) {
+			this.requestSave();
+		}
+		if (options?.render !== false) {
+			this.render();
+		}
 	}
 
 	private async renderNoteContent(cellEl: HTMLElement, cell: GridCell, renderId: number): Promise<void> {
@@ -443,6 +477,195 @@ export class GridPanesView extends ItemView {
 			addColBtn.style.gridColumn = String(cols + 1);
 			addColBtn.addEventListener('click', () => this.addColumn());
 		}
+	}
+
+	private registerSwapEvents(): void {
+		if (!this.gridContainer) return;
+		this.registerDomEvent(this.gridContainer, 'mousemove', (event: MouseEvent) => {
+			this.updateSwapButton(event);
+		});
+		this.registerDomEvent(this.gridContainer, 'mouseleave', () => {
+			this.hideSwapButton();
+		});
+	}
+
+	private ensureSwapButton(gridContainer: HTMLElement | null = this.gridContainer): HTMLButtonElement | null {
+		if (!gridContainer) return null;
+		if (this.swapButtonEl && this.swapButtonEl.isConnected) return this.swapButtonEl;
+		const btn = gridContainer.createEl('button', {
+			cls: 'grid-panes-swap-btn',
+			attr: { 'aria-label': t(this.app, 'button.swapAria'), type: 'button' },
+		});
+		btn.addEventListener('click', (event) => {
+			event.stopPropagation();
+			this.handleSwapClick();
+		});
+		this.swapButtonEl = btn;
+		return btn;
+	}
+
+	private updateSwapButton(event: MouseEvent): void {
+		if (!this.gridContainer) return;
+		const eventTarget = event.target as HTMLElement | null;
+		if (eventTarget && this.swapButtonEl && this.swapButtonEl.contains(eventTarget)) {
+			return;
+		}
+		const target = this.getSwapTarget(event);
+		if (!target) {
+			this.hideSwapButton();
+			return;
+		}
+		const fromCell = this.getCell(target.fromRow, target.fromCol);
+		const toCell = this.getCell(target.toRow, target.toCol);
+		if (!fromCell?.notePath || !toCell?.notePath) {
+			this.hideSwapButton();
+			return;
+		}
+		const btn = this.ensureSwapButton();
+		if (!btn) return;
+		btn.style.left = `${target.centerX}px`;
+		btn.style.top = `${target.centerY}px`;
+		const arrow = target.direction === 'horizontal' ? '↔' : '↕';
+		if (btn.textContent !== arrow) {
+			btn.textContent = arrow;
+		}
+		btn.addClass('visible');
+		this.swapTarget = target;
+	}
+
+	private hideSwapButton(): void {
+		if (this.swapButtonEl) {
+			this.swapButtonEl.removeClass('visible');
+		}
+		this.swapTarget = null;
+	}
+
+	private handleSwapClick(): void {
+		if (!this.swapTarget) return;
+		const { fromRow, fromCol, toRow, toCol } = this.swapTarget;
+		this.swapCells(fromRow, fromCol, toRow, toCol);
+		this.hideSwapButton();
+	}
+
+	private getSwapTarget(event: MouseEvent): SwapTarget | null {
+		const gridContainer = this.gridContainer;
+		if (!gridContainer) return null;
+		const layout = this.getCurrentLayout();
+		if (layout.rows < 2 && layout.cols < 2) return null;
+
+		const cells = Array.from(gridContainer.querySelectorAll<HTMLElement>('.grid-panes-cell'));
+		if (cells.length === 0) return null;
+
+		const containerRect = gridContainer.getBoundingClientRect();
+		const mouseX = event.clientX;
+		const mouseY = event.clientY;
+
+		const cellRects = new Map<string, DOMRect>();
+		for (const cell of cells) {
+			const row = cell.dataset.row;
+			const col = cell.dataset.col;
+			if (row !== undefined && col !== undefined) {
+				cellRects.set(`${row}-${col}`, cell.getBoundingClientRect());
+			}
+		}
+
+		const style = window.getComputedStyle(gridContainer);
+		const rawGap = Number.parseFloat(style.gap || '8');
+		const gap = Number.isNaN(rawGap) ? 8 : rawGap;
+		const hitZone = Math.max(gap, 16);
+
+		let bestTarget: SwapTarget | null = null;
+		let bestDist = Number.POSITIVE_INFINITY;
+
+		for (let row = 0; row < layout.rows; row++) {
+			for (let col = 0; col < layout.cols - 1; col++) {
+				const leftRect = cellRects.get(`${row}-${col}`);
+				const rightRect = cellRects.get(`${row}-${col + 1}`);
+				if (!leftRect || !rightRect) continue;
+
+				const gapLeft = leftRect.right;
+				const gapRight = rightRect.left;
+				const gapCenterX = (gapLeft + gapRight) / 2;
+				const gapCenterY = (leftRect.top + leftRect.bottom) / 2;
+
+				const inHorizontalZone = mouseX >= gapLeft - hitZone / 2 && mouseX <= gapRight + hitZone / 2;
+				const inVerticalZone = mouseY >= leftRect.top && mouseY <= leftRect.bottom;
+
+				if (inHorizontalZone && inVerticalZone) {
+					const dist = Math.abs(mouseX - gapCenterX);
+					if (dist < bestDist) {
+						bestDist = dist;
+						bestTarget = {
+							fromRow: row,
+							fromCol: col,
+							toRow: row,
+							toCol: col + 1,
+							direction: 'horizontal',
+							centerX: gapCenterX - containerRect.left,
+							centerY: gapCenterY - containerRect.top,
+						};
+					}
+				}
+			}
+		}
+
+		for (let col = 0; col < layout.cols; col++) {
+			for (let row = 0; row < layout.rows - 1; row++) {
+				const topRect = cellRects.get(`${row}-${col}`);
+				const bottomRect = cellRects.get(`${row + 1}-${col}`);
+				if (!topRect || !bottomRect) continue;
+
+				const gapTop = topRect.bottom;
+				const gapBottom = bottomRect.top;
+				const gapCenterX = (topRect.left + topRect.right) / 2;
+				const gapCenterY = (gapTop + gapBottom) / 2;
+
+				const inVerticalZone = mouseY >= gapTop - hitZone / 2 && mouseY <= gapBottom + hitZone / 2;
+				const inHorizontalZone = mouseX >= topRect.left && mouseX <= topRect.right;
+
+				if (inVerticalZone && inHorizontalZone) {
+					const dist = Math.abs(mouseY - gapCenterY);
+					if (dist < bestDist) {
+						bestDist = dist;
+						bestTarget = {
+							fromRow: row,
+							fromCol: col,
+							toRow: row + 1,
+							toCol: col,
+							direction: 'vertical',
+							centerX: gapCenterX - containerRect.left,
+							centerY: gapCenterY - containerRect.top,
+						};
+					}
+				}
+			}
+		}
+
+		return bestTarget;
+	}
+
+	private swapCells(firstRow: number, firstCol: number, secondRow: number, secondCol: number): void {
+		const firstCell = this.getCell(firstRow, firstCol);
+		const secondCell = this.getCell(secondRow, secondCol);
+		if (!firstCell?.notePath || !secondCell?.notePath) return;
+
+		const keyA = this.getCellKey(firstRow, firstCol);
+		const keyB = this.getCellKey(secondRow, secondCol);
+		const activeKey = this.activeCellKey;
+
+		this.setCell(firstRow, firstCol, secondCell.notePath, secondCell.mode, { save: false, render: false });
+		this.setCell(secondRow, secondCol, firstCell.notePath, firstCell.mode, { save: false, render: false });
+
+		if (activeKey === keyA) {
+			this.activeCellKey = keyB;
+			this.pendingFocusKey = keyB;
+		} else if (activeKey === keyB) {
+			this.activeCellKey = keyA;
+			this.pendingFocusKey = keyA;
+		}
+
+		this.requestSave();
+		this.render();
 	}
 
 	// 公共方法供命令使用
